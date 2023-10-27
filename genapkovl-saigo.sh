@@ -26,9 +26,10 @@ trap cleanup exit
 mkdir -p "$tmp"/etc
 mkdir -p "$tmp"/etc/apk
 mkdir -p "$tmp"/etc/network
-mkdir -p "$tmp"/etc/init.d
+mkdir -p "$tmp"/root
 
 cp ~/aports/scripts/wallpaper.png "$tmp"/etc/wallpaper.png
+cp ~/aports/scripts/tint2.tar.gz "$tmp"/etc/tint2.tar.gz
 
 makefile root:root 0644 "$tmp"/etc/hostname <<EOF
 $HOSTNAME
@@ -54,37 +55,58 @@ font-noto
 xf86-video-fbdev
 xf86-video-vesa
 xf86-video-nouveau
+xf86-video-intel
 xf86-input-vmmouse
 xf86-input-synaptics
 xf86-input-evdev
 feh
 tint2
+firefox
+alsa-utils
+alsaconf
+pulseaudio
+pulseaudio-utils
+pavucontrol-qt
+agetty
 EOF
 
-makefile root:root 0755 "$tmp"/etc/xinitrc <<EOF
+makefile root:root 0755 "$tmp"/etc/inittab <<EOF
+# /etc/inittab
+
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
+
+tty1::respawn:/sbin/agetty 38400 tty1 --autologin root --noclear
+tty2::respawn:/sbin/getty 38400 tty2
+
+::shutdown:/sbin/openrc shutdown
+
+ttyS0::respawn:/sbin/getty -L 0 ttyS0 vt100
+EOF
+
+makefile root:root 0755 "$tmp"/etc/.xinitrc <<EOF
+pulseaudio --daemon --system &
 feh --bg-fill /etc/wallpaper.png &
 tint2 &
 exec openbox-session
 EOF
 
-makefile root:root 0755 "$tmp"/etc/setup.sh <<EOF
+makefile root:root 0755 "$tmp"/etc/.profile <<EOF
 #!/bin/sh -e
 
-mv /etc/.xinitrc /root/.xinitrc
+setup-devd udev
 startx
 EOF
 
-makefile root:root 0755 "$tmp"/etc/init.d/setup <<EOF
-#!/sbin/openrc-run
+makefile root:root 0755 "$tmp"/etc/setup.sh <<EOF
+cp /etc/.xinitrc /root/
+cp /etc/.profile /root/
+/root/.profile
+EOF
 
-command="/etc/setup.sh"
-command_args=""
-command_background="yes"
-start_stop_daemon_args="--background --start --exec"
-
-depend() {
-	need localmount
-}
+makefile root:root 0644 "$tmp"/etc/motd <<EOF
+Welcome to SaigOS!
 EOF
 
 rc_add devfs sysinit
@@ -102,7 +124,6 @@ rc_add syslog boot
 
 rc_add udev boot
 rc_add dbus boot
-rc_add setup boot
 
 rc_add mount-ro shutdown
 rc_add killprocs shutdown

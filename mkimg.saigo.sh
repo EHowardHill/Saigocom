@@ -36,8 +36,11 @@ profile_saigo() {
 		openbox xterm font-noto
 		xf86-video-fbdev xf86-video-vesa xf86-video-nouveau
 		xf86-input-synaptics xf86-input-vmmouse xf86-input-evdev
+		xf86-video-intel sddm
+		alsa-utils alsaconf pulseaudio pulseaudio-utils
+		pavucontrol-qt
 
-		feh tint2
+		feh tint2 firefox
 		"
 
 	local _k _a
