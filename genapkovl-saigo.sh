@@ -30,6 +30,7 @@ mkdir -p "$tmp"/root
 
 cp ~/aports/scripts/wallpaper.png "$tmp"/etc/wallpaper.png
 cp ~/aports/scripts/tint2.tar.gz "$tmp"/etc/tint2.tar.gz
+cp ~/aports/scripts/openbox.tar.gz "$tmp"/etc/openbox.tar.gz
 
 makefile root:root 0644 "$tmp"/etc/hostname <<EOF
 $HOSTNAME
@@ -100,6 +101,10 @@ startx
 EOF
 
 makefile root:root 0755 "$tmp"/etc/setup.sh <<EOF
+mkdir -p /root/.config
+tar -xzvf /etc/tint2.tar.gz -C /root/.config
+tar -xzvf /etc/openbox.tar.gz -C /root/.config
+
 cp /etc/.xinitrc /root/
 cp /etc/.profile /root/
 /root/.profile
