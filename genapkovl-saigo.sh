@@ -93,6 +93,26 @@ makefile root:root 0755 "$tmp"/etc/.profile <<EOF
 startx
 EOF
 
+makefile root:root 0755 "$tmp"/etc/setup-script <<EOF
+INTERFACESOPTS="auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+    hostname saigo
+"
+
+KEYMAPOPTS="us us"
+HOSTNAMEOPTS="-n saigo"
+DNSOPTS="8.8.8.8"
+TIMEZONEOPTS="-z UTC"
+PROXYOPTS="none"
+APKREPOSOPTS="-1"
+SSHDOPTS="-c openssh"
+NTPOPTS="-c openntpd"
+DISKOPTS="-m sys /dev/vda"
+EOF
+
 makefile root:root 0755 "$tmp"/etc/setup-alpine <<'EOF'
 #!/bin/sh
 
