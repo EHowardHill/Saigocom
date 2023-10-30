@@ -36,14 +36,6 @@ makefile root:root 0644 "$tmp"/etc/hostname <<EOF
 $HOSTNAME
 EOF
 
-makefile root:root 0644 "$tmp"/etc/network/interfaces <<EOF
-auto lo
-iface lo inet loopback
-
-auto eth0
-iface eth0 inet dhcp
-EOF
-
 makefile root:root 0644 "$tmp"/etc/apk/world <<EOF
 alpine-base
 xorg-server
@@ -62,13 +54,14 @@ xf86-input-synaptics
 xf86-input-evdev
 feh
 tint2
-firefox
 alsa-utils
 alsaconf
 pulseaudio
 pulseaudio-utils
 pavucontrol-qt
 agetty
+picom
+flatpak
 EOF
 
 makefile root:root 0755 "$tmp"/etc/inittab <<EOF
@@ -89,6 +82,7 @@ EOF
 makefile root:root 0755 "$tmp"/etc/.xinitrc <<EOF
 pulseaudio --daemon --system &
 feh --bg-fill /etc/wallpaper.png &
+picom -c &
 tint2 &
 exec openbox-session
 EOF
@@ -96,14 +90,104 @@ EOF
 makefile root:root 0755 "$tmp"/etc/.profile <<EOF
 #!/bin/sh -e
 
-setup-devd udev
 startx
+EOF
+
+makefile root:root 0755 "$tmp"/etc/setup-saigo.sh <<'EOF'
+#!/bin/sh -e
+
+PREFIX=@PREFIX@
+: ${LIBDIR=$PREFIX/lib}
+. "$LIBDIR/libalpine.sh"
+
+USEROPTS="-a -u -g audio,video,netdev juser"
+
+setup-hostname saigo
+rc-service hostname --quiet restart
+
+setup-keymap us us
+setup-devd -C mdev
+setup-timezone UTC
+setup-dns 208.67.222.123
+
+printf "auto lo
+iface lo inet loopback
+auto eth0
+iface eth0 inet dhcp
+	hostname alpine-test" | setup-interfaces -i ${rst_if:+-r}
+
+rc-update --quiet add networking boot
+rc-update --quiet add seedrng boot || rc-update --quiet add urandom boot
+svc_list="cron crond"
+
+if [ -e /dev/input/event0 ]; then
+	svc_list="$svc_list acpid"
+fi
+
+for svc in $svc_list; do
+	if rc-service --exists $svc; then
+		rc-update --quiet add $svc
+	fi
+done
+
+# start up the services
+$MOCK openrc ${SSH_CONNECTION:+-n} boot
+$MOCK openrc ${SSH_CONNECTION:+-n} default
+
+_dn=$(sed -n \
+-e '/^domain[[:space:]][[:space:]]*/{s///;s/\([^[:space:]]*\).*$/\1/;h;}' \
+-e '/^search[[:space:]][[:space:]]*/{s///;s/\([^[:space:]]*\).*$/\1/;h;}' \
+-e '${g;p;}' "$ROOT"/etc/resolv.conf 2>/dev/null)
+
+_hn=$(hostname)
+_hn=${_hn%%.*}
+
+sed -i -e "s/^127\.0\.0\.1.*/127.0.0.1\t${_hn}.${_dn:-$(get_fqdn my.domain)} ${_hn} localhost.localdomain localhost/" \
+	"$ROOT"/etc/hosts 2>/dev/null
+
+setup-ntp openntpd
+setup-apkrepos -1
+setup-devd mdev
+setup-user ${USERSSHKEY+-k "$USERSSHKEY"} ${USEROPTS:--a -g 'audio video netdev'}
+for i in "$ROOT"home/*; do
+	if [ -d "$i" ]; then
+		lbu add $i
+	fi
+done
+
+setup-disk -w /tmp/alpine-install-diskmode.out -q -m sys /dev/vda || exit
+
+# setup lbu and apk cache unless installed sys on disk
+if [ $(cat /tmp/alpine-install-diskmode.out 2>/dev/null) != "sys" ]; then
+	setup-lbu LABEL=APKOVL
+	setup-apkcache /media/LABEL=APKOVL/cache
+	apk cache sync
+fi
 EOF
 
 makefile root:root 0755 "$tmp"/etc/setup.sh <<EOF
 mkdir -p /root/.config
 tar -xzvf /etc/tint2.tar.gz -C /root/.config
 tar -xzvf /etc/openbox.tar.gz -C /root/.config
+
+INTERFACESOPTS="auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+	hostname alpine-test
+"
+
+setup-timezone UTC
+setup-dns 208.67.222.123
+setup-devd udev
+setup-keymap us us
+setup-hostname saigo
+setup-apkrepos -1
+
+printf "$INTERFACESOPTS" | setup-interfaces -i ${rst_if:+-r}
+
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 cp /etc/.xinitrc /root/
 cp /etc/.profile /root/

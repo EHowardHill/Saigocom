@@ -40,7 +40,7 @@ profile_saigo() {
 		alsa-utils alsaconf pulseaudio pulseaudio-utils
 		pavucontrol-qt
 
-		feh tint2 firefox
+		feh tint2 picom flatpak
 		"
 
 	local _k _a
